@@ -1,0 +1,210 @@
+一、Selectors（选择器）
+	当抓取网页时，你做的最常见的任务是从HTML源码中提取数据。现有的一些库可以达到这个目的：
+		1.BeautifulSoup 是在程序员间非常流行的网页分析库，它基于HTML代码的结构来构造一个Python对象， 对不良标记的处理也非常合理，但它有一个缺点：慢。
+		2.lxml 是一个基于ElementTree(不是Python标准库的一部分)的python化的XML解析库(也可以解析HTML)。
+	1、选择器使用
+		1.构造选择器
+		Scrapy selector是以文字(text)或TextResponse构造的Selector实例。其根据输入的类型自动选择最优的分析方法(XML vs HTML):
+		>>> from scrapy.selector import Selector
+		>>> from scrapy.http import HtmlResponse
+		
+		以文字构造:
+		>>> body = '<html><body><span>good</span></body></html>'
+		>>> Selector(text=body).xpath('//span/text()').extract()
+		[u'good']
+
+		以response构造:
+		>>> response = HtmlResponse(url='http://example.com', body=body)
+		>>> Selector(response=response).xpath('//span/text()').extract()
+		[u'good']
+
+		为了方便起见，response对象以.selector属性提供了一个selector，您可以随时使用该快捷方法:
+		>>> response.selector.xpath('//span/text()').extract()
+		[u'good']
+
+		2.选择器的常用方法
+		为了提取真实的原文数据，你需要调用.extract()方法如下:
+		>>> response.xpath('//title/text()').extract()
+		[u'Example website']
+
+		如果想要提取到第一个匹配到的元素, 必须调用.extract_first()
+		>>> response.xpath('//div[@id="images"]/a/text()').extract_first()
+		u'Name: My image 1 '
+
+		如果没有匹配的元素，则返回 None:
+		>>> response.xpath('//div/[id="not-exists"]/text()').extract_first() is None
+		True
+
+		可以设置默认的返回值，替代 None :
+		>>> response.xpath('//div/[id="not-exists"]/text()').extract_first(default='not-found')
+		'not-found'
+
+		注意CSS选择器可以使用CSS3伪元素(pseudo-elements)来选择文字或者属性节点:
+		>>> response.css('title::text').extract()
+		[u'Example website']
+
+		例子：
+		# 提取base标签中属性href的值
+		>>> response.xpath('//base/@href').extract()
+		[u'http://example.com/']
+
+		>>> response.css('base::attr(href)').extract()
+		[u'http://example.com/']
+
+		# 提取a链接中href属性包含image的href属性值
+		>>> response.xpath('//a[contains(@href, "image")]/@href').extract()
+		[u'image1.html',
+		 u'image2.html',
+		 u'image3.html',
+		 u'image4.html',
+		 u'image5.html']
+
+		>>> response.css('a[href*=image]::attr(href)').extract()
+		[u'image1.html',
+		 u'image2.html',
+		 u'image3.html',
+		 u'image4.html',
+		 u'image5.html']
+
+		# 提取a链接中href属性包含image的下面img标签的src属性
+		>>> response.xpath('//a[contains(@href, "image")]/img/@src').extract()
+		[u'image1_thumb.jpg',
+		 u'image2_thumb.jpg',
+		 u'image3_thumb.jpg',
+		 u'image4_thumb.jpg',
+		 u'image5_thumb.jpg']
+
+		>>> response.css('a[href*=image] img::attr(src)').extract()
+		[u'image1_thumb.jpg',
+		 u'image2_thumb.jpg',
+		 u'image3_thumb.jpg',
+		 u'image4_thumb.jpg',
+		 u'image5_thumb.jpg']
+
+		3.嵌套选择器使用
+		选择器方法(.xpath()or.css())返回相同类型的选择器列表，可以对这些选择器调用选择器方法。下面是一个例子:
+
+		>>> links = response.xpath('//a[contains(@href, "image")]')
+		>>> links.extract()
+		[u'<a href="image1.html">Name: My image 1 <br><img src="image1_thumb.jpg"></a>',
+		u'<a href="image2.html">Name: My image 2 <br><img src="image2_thumb.jpg"></a>',
+		u'<a href="image3.html">Name: My image 3 <br><img src="image3_thumb.jpg"></a>',
+		u'<a href="image4.html">Name: My image 4 <br><img src="image4_thumb.jpg"></a>',
+		u'<a href="image5.html">Name: My image 5 <br><img src="image5_thumb.jpg"></a>']
+
+		>>> for index, link in enumerate(links):
+		    args = (index, link.xpath('@href').extract(), link.xpath('img/@src').extract())
+		    print 'Link number %d points to url %s and image %s' % args
+
+		Link number 0 points to url [u'image1.html'] and image [u'image1_thumb.jpg']
+		Link number 1 points to url [u'image2.html'] and image [u'image2_thumb.jpg']
+		Link number 2 points to url [u'image3.html'] and image [u'image3_thumb.jpg']
+		Link number 3 points to url [u'image4.html'] and image [u'image4_thumb.jpg']
+		Link number 4 points to url [u'image5.html'] and image [u'image5_thumb.jpg']
+
+		4.结合正则表达式使用选择器(selectors)
+		Selector 也有一个.re()方法，用来通过正则表达式来提取数据。然而，不同于使用.xpath()或者.css()方法,.re() 方法返回unicode字符串的列表。所以无法构造嵌套式的.re()调用。
+		例子：
+		>>> response.xpath('//a[contains(@href, "image")]/text()').re(r'Name:\s*(.*)')
+		[u'My image 1',
+		 u'My image 2',
+		 u'My image 3',
+		 u'My image 4',
+		 u'My image 5']
+
+		另外.re_first()，使用该函数可以提取第一个匹配到的字符串:
+		>>> response.xpath('//a[contains(@href, "image")]/text()').re_first(r'Name:\s*(.*)')
+		u'My image 1'
+
+		5.使用相对XPaths路径
+		在xpath中的路劲，'//'表示的是绝对路径，而不是相对路径。
+		比如，假设想提取在<div>元素中的所有<p>元素。首先，你将先得到所有的<div>元素：
+		>>> divs = response.xpath('//div')
+
+		然后提取div中的p元素：
+		>>> for p in divs.xpath('//p'):  # this is wrong - gets all <p> from the whole document
+		...     print p.extract()
+		它其实是从整篇文档中，而不仅仅是从那些<div>元素内部提取所有的<p>元素
+
+		正确做法：
+		注意：.//p 加上点前缀:
+		>>> for p in divs.xpath('.//p'):  # extracts all <p> inside
+		...     print p.extract()
+
+		另一种常见的方法将是提取所有直系字标签<p>的结果:
+		>>> for p in divs.xpath('p'):
+		...     print p.extract()
+
+		6.XPath表达式中的变量
+			xpath表达式可以使用类似于SQL语句的占位符？，对变量进行替换，其占位符是$加上一个变量名，如：
+			>>> response.xpath('//div[@id=$val]/a/text()', val='images').extract_first()
+			u'Name: My image 1 '
+
+			# 提取出包含5个a链接的div的id值
+			>>> response.xpath('//div[count(a)=$cnt]/@id', cnt=5).extract_first()
+			u'images'
+
+	2、使用Xpath选择器的技巧
+		1.某种条件按下使用文本节点代替.//text()
+			当你需要使用一个XPath字符串函数的文本内容作为参数时,避免使用.//text()而是使用.代替
+
+		2.//node[1]和(//node)[1]的区别
+			//node[1]：是获取在各自父类下的第一个节点
+			(//node)[1]：是获取在整个文档下的这一类的第一个节点
+		 	如：
+		 	>>> from scrapy import Selector
+			>>> sel = Selector(text="""
+			....:     <ul class="list">
+			....:         <li>1</li>
+			....:         <li>2</li>
+			....:         <li>3</li>
+			....:     </ul>
+			....:     <ul class="list">
+			....:         <li>4</li>
+			....:         <li>5</li>
+			....:         <li>6</li>
+			....:     </ul>""")
+			>>> xp = lambda x: sel.xpath(x).extract()
+
+			>>> xp("//li[1]")
+			[u'<li>1</li>', u'<li>4</li>']
+
+			>>> xp("(//li)[1]")
+			[u'<li>1</li>']
+
+			>>> xp("//ul/li[1]")
+			[u'<li>1</li>', u'<li>4</li>']
+
+			>>> xp("(//ul/li)[1]")
+			[u'<li>1</li>']
+
+		3.当一个节点含有多个类名时，善用css选择器替代xpath选择器
+			如：
+			>>> from scrapy import Selector
+			>>> sel = Selector(text='<div class="hero shout"><time datetime="2014-07-23 19:00">Special date</time></div>')
+			>>> sel.css('.shout').xpath('./time/@datetime').extract()
+			[u'2014-07-23 19:00']
+			先使用css选择器，选出具体节点，在通过xpath选择器进行细节处理。
+
+	3、内置的Selector实例的方法
+		Selector的实例时针对匹配内容响应的封装对象。
+
+		1.类 class scrapy.selector.Selector(response=None, text=None, type=None)
+			response 是HtmlResponse或XmlResponse的一个对象，将被用来选择和提取数据。
+			
+			text 是在response不指定时的一个unicode字符串或utf-8编码的文字。将text和response 一起使用是不能够认可的行为。
+
+			type 定义了选择器类型，可以是 "html", "xml" 或者 "None"(默认).
+				如果type是None，选择器会根据response类型(参见下面)自动选择最佳的类型，
+				或者在和tex 一起使用时，默认为 "html" 。
+				
+				如果type是None ，并传递了一个response ，选择器类型将从response类型中推导如下：
+				"html" for HtmlResponse type
+				"xml" for XmlResponse type
+				"html" for anything else
+				其他情况下，如果设定了type ，选择器类型将被强制设定，而不进行检测。
+
+		2.常用方法
+		针对Selector实例的常用方法，有：xpath()、css()、extract()、re()、register_namespace()、remove_namespaces()
+		这些方法放回的SelectorList中的元素同样实现了以上常用的方法（xpath()、css()、extract()、re()），可以继续调用。
+

@@ -1,0 +1,110 @@
+一、支持的多种序列化格式
+	自带支持的类型有：
+	1.JSON
+		FEED_FORMAT:json
+		exporter:JsonItemExporter
+
+	2.JSON lines
+		FEED_FORMAT:jsonlines
+		exporter:JsonLinesItemExporter
+	3.CSV
+		FEED_FORMAT:csv
+		exporter:CsvItemExporter
+	4.XML
+		FEED_FORMAT:xml
+		Exporter:XmlItemExporter
+
+	5.Pickle
+		FEED_FORMAT:pickle
+		exporter:PickleItemExporter
+
+	6.Marshal
+		FEED_FORMAT:marshal
+		exporter:MarshalItemExporter
+
+二、存储
+	feed输出支持的几种存储后端类型：
+	1.Local filesystem
+	2.FTP
+	3.S3
+	4.Standard output
+
+	2.1 存储URI参数
+		存储URI也包含参数。当feed被创建时这些参数可以被覆盖:
+			%(time)s - 当feed被创建时被timestamp覆盖
+			%(name)s - 被spider的名字覆盖
+			其他命名的参数会被spider同名的属性所覆盖。例如， 当feed被创建时， %(site_id)s 将会被 spider.site_id 属性所覆盖。
+		例子来说明:
+		存储在FTP，每个spider一个目录:
+			ftp://user:password@ftp.example.com/scraping/feeds/%(name)s/%(time)s.json
+		存储在S3，每一个spider一个目录:
+			s3://mybucket/scraping/feeds/%(name)s/%(time)s.json
+
+	2.3	存储端
+		1.本地文件系统(Local filesystem)
+		将feed存储在本地系统。
+			URI scheme：file
+			URI样例：file:///tmp/export.csv
+			需要依赖的库：none
+			注意: (只有)存储在本地文件系统时，您可以指定一个绝对路径/tmp/export.csv，并忽略协议(scheme)。不过这仅仅只能在Unix系统中工作。
+		2.FTP
+		将feed存储在FTP服务器。
+			URI scheme: ftp
+			URI样例: ftp://user:pass@ftp.example.com/path/to/export.csv
+			需要的外部依赖库: none
+
+		3.S3
+		将feed存储在 Amazon S3 。
+			URI scheme: s3
+			URI样例:
+			s3://mybucket/path/to/export.csv
+			s3://aws_key:aws_secret@mybucket/path/to/export.csv
+			需要的外部依赖库: boto
+			您可以通过在URI中传递user/pass来完成AWS认证，或者也可以通过下列的设置来完成:
+			AWS_ACCESS_KEY_ID
+			AWS_SECRET_ACCESS_KEY
+
+		4.标准输出(Standard output)k
+		feed输出到Scrapy进程的标准输出。
+			URI scheme: stdout
+			URI样例: stdout:
+			需要的外部依赖库: none
+
+三、Requests and Responses
+	1、Request objects
+		class scrapy.http.Request(url[, callback, method='GET', headers, body, cookies, meta, encoding='utf-8', priority=0, dont_filter=False, errback, flags])
+	2、Request subclasses
+		class scrapy.http.FormRequest(url[, formdata, ...]
+
+	3、Response objects
+		class scrapy.http.Response(url[, status=200, headers=None, body=b'', flags=None, request=None])
+		
+	4、Response subclasses
+		1.class scrapy.http.TextResponse(url[, encoding[, ...]])
+		2.class scrapy.http.HtmlResponse(url[, ...])
+		3.class scrapy.http.XmlResponse(url[, ...])
+
+四、Link Extractors
+	默认的链接提取器：from scrapy.linkextractors import LinkExtractor，与LxmlLinkExtractor一样的用法。
+	class scrapy.linkextractors.lxmlhtml.LxmlLinkExtractor(allow=(), deny=(), allow_domains=(), deny_domains=(), deny_extensions=None, restrict_xpaths=(), restrict_css=(), tags=('a', 'area'), attrs=('href', ), canonicalize=False, unique=True, process_value=None, strip=True)
+	API查看：https://doc.scrapy.org/en/latest/topics/link-extractors.html#module-scrapy.linkextractors.lxmlhtml
+
+五、关于Scrapy配置项
+	1、每种类型配置项的优先级：
+		1.Command line options (most precedence)（命令行选项（最优先））
+		2.Settings per-spider（每个蜘蛛的设置）
+		3.Project settings module（项目设置模块）
+		4.Default settings per-command（每个命令的默认设置）
+		5.Default global settings (less precedence(优先))（（默认全局设置（优先级较低））
+	2、关于setting.py中的配置项说明
+		查看API：https://doc.scrapy.org/en/latest/topics/settings.html
+
+六、异常
+	异常类别：
+		1.DropItem
+		2.CloseSpider
+		3.DontCloseSpider
+		4.IgnoreRequest
+		5.NotConfigured
+		6.NotSupported
+	API查看：https://doc.scrapy.org/en/latest/topics/exceptions.html#scrapy.exceptions.CloseSpider

@@ -1,0 +1,117 @@
+一、Scrapy的认识和配置
+Scrapy是一个为了爬取网站数据，提取结构性数据而编写的应用框架。 可以应用在包括数据挖掘，信息处理或存储历史数据等一系列的程序中。
+其最初是为了页面抓取 (更确切来说, 网络抓取 )所设计的， 也可以应用在获取API所返回的数据(例如 Amazon Associates Web Services ) 或者通用的网络爬虫。Scrapy用途广泛，可以用于数据挖掘、监测和自动化测试。
+1.1 Scrapy主要包括了以下组件：
+	1、引擎(Scrapy): 用来处理整个系统的数据流处理, 触发事务(框架核心)
+	2、调度器(Scheduler): 用来接受引擎发过来的请求, 压入队列中, 并在引擎再次请求的时候返回. 可以想像成一个URL（抓取网页的网址或者说是链接）的优先队列, 由它来决定下一个要抓取的网址是什么, 同时去除重复的网址。
+	3、下载器(Downloader): 用于下载网页内容, 并将网页内容返回给蜘蛛(Scrapy下载器是建立在twisted这个高效的异步模型上的)
+	4、爬虫(Spiders): 爬虫是主要干活的, 用于从特定的网页中提取自己需要的信息, 即所谓的实体(Item)。用户也可以从中提取出链接,让Scrapy继续抓取下一个页面
+	5、项目管道(Pipeline): 负责处理爬虫从网页中抽取的实体，主要的功能是持久化实体、验证实体的有效性、清除不需要的信息。当页面被爬虫解析后，将被发送到项目管道，并经过几个特定的次序处理数据。
+	6、下载器中间件(Downloader Middlewares): 位于Scrapy引擎和下载器之间的框架，主要是处理Scrapy引擎与下载器之间的请求及响应。
+	7、爬虫中间件(Spider Middlewares): 介于Scrapy引擎和爬虫之间的框架，主要工作是处理蜘蛛的响应输入和请求输出。
+	8、调度中间件(Scheduler Middewares): 介于Scrapy引擎和调度之间的中间件，从Scrapy引擎发送到调度的请求和响应。
+1.2 Scrapy运行流程大概如下：
+	1、首先，引擎从调度器中取出一个链接(URL)用于接下来的抓取
+	2、引擎把URL封装成一个请求(Request)传给下载器，下载器把资源下载下来，并封装成应答包(Response)
+	然后，爬虫解析Response
+	3、若是解析出实体（Item）,则交给实体管道进行进一步的处理。
+	4、若是解析出的是链接（URL）,则把URL交给Scheduler等待抓取。
+1.3 Scrapy的环境配置和安装
+	1、pip install virtualenv  #安装虚拟环境工具
+	2、virtualenv ENV  #创建一个虚拟环境目录
+	3、source ./ENV/bin/active  #激活虚拟环境（并不可用）
+	4、pip install Scrapy
+	5、手动安装pywin32，地址：https://sourceforge.net/projects/pywin32/files/pywin32/Build%20220/ 根据系统位数和python版本安装，本系统是32位，python2.7 故安装：pywin32-220.win32-py2.7.exe
+1.4 Scrapy的项目创建
+	1、scrapy startproject scrapystart 项目创建命令
+	2、这个命令会在当前目录下创建一个新目录 scrapystart, 它的结构如下:
+		.
+		├── scrapy.cfg
+		└── scrapystart
+		    ├── __init__.py
+		    ├── items.py
+		    ├── pipelines.py
+		    ├── settings.py
+		    └── spiders
+		        └── __init__.py
+		这些文件主要是：
+			scrapy.cfg: 项目配置文件
+			scrapystart/: 项目python模块, 之后您将在此加入代码
+			scrapystart/items.py: 项目items文件
+			scrapystart/pipelines.py: 项目管道文件
+			scrapystart/settings.py: 项目配置文件
+			scrapystart/spiders: 放置spider的目录
+1.5 运行项目的指定爬虫类和数据提取
+	1、scrapy crawl quotes(在spider中定义的name值)
+	2、cmd 运行 scrapy shell "http://quotes.toscrape.com/page/1/" 进行该页面的数据提取操作，注意windows用户url地址要用双引号包裹
+	3、
+		response.css() 采用类似css选择器将需要的结构元素提取出来，如：
+			response.css('title') 提取页面的title标签数据，返回的是一个SelectorList类似列表的对象
+			response.css('title::text').extract() 进一步提取title的数据，返回的是一个List
+			response.css('title::text').extract_first() 获取列表数据的第一项，没有则返回None
+		response.re() 采用正则方式匹配进行数据提取，如：
+			>>> response.css('title::text').re(r'Quotes.*')
+			['Quotes to Scrape']
+			>>> response.css('title::text').re(r'Q\w+')
+			['Quotes']
+			>>> response.css('title::text').re(r'(\w+) to (\w+)')
+			['Quotes', 'Scrape']	
+		response.xpath() XPath表达式非常强大，是 Scrapy 选择器的基础。事实上，CSS 选择器转换为 XPath 。
+		>>> response.xpath('//title')
+		[<Selector xpath='//title' data='<title>Quotes to Scrape</title>'>]
+		>>> response.xpath('//title/text()').extract_first()
+		'Quotes to Scrape
+1.6 定义spider类进行数据提取
+	在目录spiders中要建立一个Spider，继承 scrapy.Spider 基类，并确定三个主要的、强制的属性：
+	name：爬虫的识别名，它必须是唯一的，在不同的爬虫中你必须定义不同的名字.
+	start_urls：包含了Spider在启动时进行爬取的url列表。因此，第一个被获取到的页面将是其中之一。后续的URL则从初始的URL获取到的数据中提取。我们可以利用正则表达式定义和过滤需要进行跟进的链接。
+	parse()：是spider的一个方法。被调用时，每个初始URL完成下载后生成的 Response 对象将会作为唯一的参数传递给该函数。该方法负责解析返回的数据(response data)，提取数据(生成item)以及生成需要进一步处理的URL的 Request 对象。
+	这个方法负责解析返回的数据、匹配抓取的数据(解析为 item )并跟踪更多的 URL。
+	例如：
+		import scrapy
+			class QuotesSpider(scrapy.Spider):
+			    name = "quotes"
+			    start_urls = [
+			        'http://quotes.toscrape.com/page/1/',
+			        'http://quotes.toscrape.com/page/2/',
+			    ]
+
+			    def parse(self, response):
+			        for quote in response.css('div.quote'):
+			            yield {
+			                'text': quote.css('span.text::text').extract_first(),
+			                'author': quote.css('small.author::text').extract_first(),
+			                'tags': quote.css('div.tags a.tag::text').extract(),
+			            }
+1.7 存储爬虫数据
+	使用命令行：
+	1、scrapy crawl quotes -o quotes.json 该命令会将数据序列化成json数组的格式，但是如果重复运行这条命令会重复添加，就会生成一个非法的json文件。
+	2、scrapy crawl quotes -o quotes.jl 该命令是一条数据以一行一个json的形式存储，重复运行只会另起一行存储，并不会生成非法的格式文件。
+
+1.8 跟踪链接
+	使用 scrapy.Request(next_page,callback=self.parse) 或者 response.follow(next_page,callback=self.parse)跟踪链接
+	注意使用 yield 关键字进行声明这些方法是可重调。例如：
+	for quote in response.css("div.quote"):
+			yield {
+				'text': quote.css('span.text::text').extract_first(),
+                'author': quote.css('small.author::text').extract_first(),
+                'tags': quote.css('div.tags a.tag::text').extract(),
+			}
+		# next_page = response.css('li.next a::attr(href)').extract_first()
+		# if next_page is not None:
+		# 	next_page = response.urljoin(next_page)
+		# 	# 跟踪下一页的链接数据
+		# 	# yield scrapy.Request(next_page,callback=self.parse)
+
+		# 	# 可以替代上面的请求发出，并且response.follow()支持相对路径的值，以及a标签的Selector对象
+		# 	yield response.follow(next_page,callback=self.parse)
+
+		for a in response.css('li.next a'):
+			yield response.follow(a,callback=self.parse)
+
+1.9 spider参数传递和其他表达式
+	Scrapy默认对于已经访问过的url进行剔除，提高了性能，当然可以通过 DUPEFILTER_CLASS 进行配置。
+	在运行爬虫时，可以使用 -a 选项为您的爬虫提供命令行参数：
+	scrapy crawl quotes -o quotes2.json -a tag=humor
+	这些参数传递给 Spider 的 __init__ 方法，默认成为spider属性。
+	在此示例中，为 tag 参数提供的值将通过 self.tag 提供。您可以使用此方法使您的爬虫根据参数构建 URL来实现仅抓取带有特定tag的数据：

@@ -1,0 +1,8 @@
+问题：
+1、如何解决导出成cvs文件，用excel打开中文数据会乱码的问题？
+	答：可以使用encode("gbk")解决在windows用户下用excel打开csv文件时乱码的问题，也可以在setting.py文件中全局配置FEED_EXPORT_ENCODING = 'gbk'导出文件时的编码
+
+2、如何解决导出成csv文件，表头字段的按照需要顺序进行排列？
+
+3、关于setting.py文件中的ROBOTSTXT_OBEY的使用注意事项？
+    答：是否遵守robots.txt

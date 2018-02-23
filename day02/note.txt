@@ -1,0 +1,185 @@
+一、Scrapy命令行工具
+	1、创建scrapy项目 scrapy startproject myproject [test]
+	2、创建spider scrapy genspider nike(spider的name) nike.com(爬虫的域名)
+	3、Scrapy的命令分类：
+		3.1 全局命令
+			可以在任何目录下使用
+			startproject
+			genspider
+			settings
+			runspider
+			shell
+			fetch
+			view
+			version
+		3.2 项目命令
+			只能在scrapy项目的目录下使用
+			crawl
+			check
+			list
+			edit
+			parse
+			bench
+	4、常用的快捷工具命令语法
+		4.1 startproject  
+			创建项目
+			语法：scrapy startproject <project_name> [project_dir]
+			如果project_dir不指定，则目录会和project_name一样
+		4.2 genspider
+			创建spider类
+			语法：scrapy genspider [-t template] <name> <domain> 
+			-t 使用默认提供的模板，可用模板：
+				basic
+				crawl
+				csvfeed
+				xmlfeed 
+
+			name spider类的name属性值
+			domain 规定了spider类allowed_domains和start_urls的值
+		4.3 crawl
+		使用某个spider进行爬数据
+		语法：scrapy crawl <spider>
+		spider spider类的name值
+		4.4 check
+		语法：scrapy check [-l] <spider>
+		4.5 list
+		列出所有当前项目中的spider类
+		语法 scrapy list
+		4.6 fetch
+		针对给定的url进行提取页面数据
+		语法：scrapy fetch <url>，如：
+		scrapy fetch [options] http//:www.baidu.com
+		scrapy fetch --nolog http//:www.baidu.com(禁止爬虫日志的输出)
+		4.7 view
+		使用指定的url进行下载并打开一个本地的页面
+		语法：scrapy view http//:www.baidu.com
+		4.8 shell
+		在cmd打开scrapy交互环境，进行控制
+		语法：scrapy shell <url>
+		4.9 runspider
+		语法：scrapy runspider <spider_file.py>
+		运行一个spider的python文件，无需创建一个scrapy项目
+
+
+二、Spiders
+	2.1 定义一个spider类的步骤
+		1、首先必须继承Scrapy.spider这个基类，其中该基类提供了可以进行实现的方法start_requests，以用来发送请求。
+		2、定义name属性，属于该spider的唯一标示，不能够在一个scrapy项目中出现重复命名的spider。
+		3、allowed_domains<List> 允许spider类进行爬虫的域名，可选项，默认是所有域名都可以爬，如果在start_urls指定的url不包含在allowed_domains规定域名内，将不会被处理。
+		4、start_urls 列表定义一组spider请求的url
+		5、start_requests()
+			这个方法必须返回一个可迭代对象，切记！！！！如果想对属性start_urls做一些操作（增删改），并希望结果作为种子url去采集网站的时候，可以重写这个方法来实现。有了这个方法，甚至都不用在代码中定义start_urls。比如我们想要读取持久化的url执行采集操作，那么就没必要转存进start_urls里面，可以直接请求这些urls。当种子urls需要post请求的话，也需要重写该方法。
+		6、parse(self, response):
+			这个方法作为请求的默认回调方法，Request没有指定回调方法的时候会调用它，这个回调方法和别的回调方法一样返回值只能是Request, 字典和item对象，或者它们的可迭代对象。
+	2.2 Spider的参数
+		1、可以通过命令行提供参数，如：scrapy crawl myspider -a category=electronics
+		2、可以通过书写代码提供参数，如：
+			import scrapy
+			class MySpider(scrapy.Spider):
+			    name = 'myspider'
+
+			    def __init__(self, category=None, *args, **kwargs):
+			        super(MySpider, self).__init__(*args, **kwargs)
+			        self.start_urls = ['http://www.example.com/categories/%s' % category]
+			可以在spider类中的其他方法中调用传递的参数，他携带在spider的实例self中。
+			import scrapy
+			class MySpider(scrapy.Spider):
+			    name = 'myspider'
+
+			    def start_requests(self):
+			        yield scrapy.Request('http://www.example.com/categories/%s' % self.category)
+	2.3 Spider的通用类（Generic Spiders）
+		一、CrawlSpider
+			1、rules：
+				可以通过重写属性rules进行多个规则匹配网站的链接，List数据结构，如果多个规则匹配相同的链接,第一个将使用,根据该属性定义的顺序。
+			2、parse_start_url(response)：
+				start_urls响应调用此方法。它允许解析(解析)最初的返回并且必须返回一个Item对象,一个Request对象,或一个包含其中任何iterable。
+			3、定义rules属性的规则：
+				使用Rule类进行对rules的每一项进行定义，其中参数有如：
+				Rule(link_extractor, callback=None, cb_kwargs=None, follow=None, process_links=None, process_request=None)
+
+				1.link_extractor 是一个Link Extractor对象。其定义了如何从爬取到的页面提取链接。
+
+				2.callback 是一个callable或string(该spider中同名的函数将会被调用)。从link_extractor中每获取到链接时将会调用该函数。该回调函数接受一个response作为其第一个参数， 并返回一个包含Item以及(或)Request对象(或者这两者的子类)的列表(list)。
+				警告：
+					当编写爬虫规则时，请避免使用parse作为回调函数。由于CrawlSpider使用parse 方法来实现其逻辑，如果 您覆盖了parse方法，crawl的spider将会运行失败。
+
+				3.cb_kwargs 包含传递给回调函数的参数(keyword argument)的字典
+
+				4.follow 是一个布尔(boolean)值，指定了根据该规则从response提取的链接是否需要跟进。如果callback 为None，follow默认设置为True，否则默认为False。
+
+				5.process_links 是一个callable或string(该spider中同名的函数将会被调用)。从link_extractor中获取到链接列表时将会调用该函数。该方法主要用来过滤。
+
+				6.process_request 是一个callable或string(该spider中同名的函数将会被调用)。该规则提取到每个request时都会调用该函数。该函数必须返回一个request或者None。(用来过滤request)
+		
+		二、XMLFeedSpider
+			XMLFeedSpider被设计用于通过迭代各个节点来分析XML源(XMLfeed)。迭代器可以从iternodes，xml，html 选择。鉴于xml以及html迭代器需要先读取所有DOM再分析而引起的性能问题，一般还是推荐使用iternodes。 不过使用html作为迭代器能有效应对错误的XML。
+			1、iterator
+				用于确定使用哪个迭代器。可选项有:
+				'iternodes'：一个高性能的基于正则表达式的迭代器
+				'html'：使用 Selector 的迭代器。需要注意的是该迭代器使用DOM进行分析，其需要将所有的DOM载入内存当数据量大的时候会产生问题。
+				'xml' - 使用Selector的迭代器。需要注意的是该迭代器使用DOM进行分析，其需要将所有的DOM载入内存， 当数据量大的时候会产生问题。
+				默认值为 iternodes 。
+			2、itertag
+				一个包含开始迭代的节点名的string类型。例如:
+				itertag = 'product'
+			3、namespaces
+				一个由(prefix, url)元组(tuple)所组成的list。其定义了在该文档中会被spider处理的可用的namespace。 prefix 及 uri 会被自动调用 register_namespace() 生成namespace。
+				您可以通过在 itertag 属性中制定节点的namespace。
+				例如:
+				class YourSpider(XMLFeedSpider):
+				    namespaces = [('n', 'http://www.sitemaps.org/schemas/sitemap/0.9')]
+				    itertag = 'n:url'
+				    # ...
+				除了这些新的属性之外，该spider也有以下可以覆盖(overrideable)的方法:
+
+			4、adapt_response(response)
+				该方法在spider分析response前被调用。您可以在response被分析之前使用该函数来修改内容(body)。该方法接受一个response并返回一个response(可以相同也可以不同)。
+
+			5、parse_node(response, selector)
+				当节点符合提供的标签名时(itertag)该方法被调用。接收到的response以及相应的Selector作为参数传递给该方法。 该方法返回一个 Item 对象或者 Request 对象 或者一个包含二者的可迭代对象(iterable)。
+
+			6、process_results(response, results)
+				当spider返回结果(item或request)时该方法被调用。设定该方法的目的是在结果返回给框架核心(framework core)之前做最后的处理，例如设定item的ID。其接受一个结果的列表(list of results)及对应的response。其结果必须返回一个结果的列表(list of results)(包含Item或者Request对象)。
+
+		三、CSVFeedSpider
+			该spider除了其按行(row)遍历而不是节点(node)之外其他和XMLFeedSpider十分类似。 而其在每次迭代时调用的是 parse_row()。
+			1、delimiter
+				在CSV文件中用于区分字段的分隔符。类型为string。默认为 ',' (逗号)。
+
+			2、quotechar
+				包含在CSV文件中每个字段的分隔符的字符串默认为'，'（逗号）。
+
+			3、headers
+				在CSV文件中包含的用来提取字段的行的列表。
+
+			4、parse_row(response, row)
+				该方法接收一个response对象及一个以提供或检测出来的header为键的字典(代表每行)。 该spider中，您也可以覆盖 adapt_response 及 process_results 方法来进行预处理(pre-processing)及后(post-processing)处理。
+		
+		四、SitemapSpider
+			SitemapSpider使您爬取网站时可以通过Sitemaps来发现爬取的URL。
+			其支持嵌套的sitemap，并能从 robots.txt 中获取sitemap的url。
+			1、sitemap_urls
+				包含您要爬取的url的sitemap的url列表(list)。 您也可以指定为一个robots.txt ，spider会从中分析并提取url。
+			2、sitemap_rules
+				一个包含 (regex, callback) 元组的列表(list):
+				regex 是一个用于匹配从sitemap提供的url的正则表达式。 regex 可以是一个字符串或者编译的正则对象(compiled regex object)。
+				callback指定了匹配正则表达式的url的处理函数。 callback 可以是一个字符串(spider中方法的名字)或者是callable。
+				例如:
+				sitemap_rules = [('/product/', 'parse_product')]
+				规则按顺序进行匹配，之后第一个匹配才会被应用。
+				如果您忽略该属性，sitemap中发现的所有url将会被parse函数处理。
+
+			3、sitemap_follow
+				一个用于匹配要跟进的sitemap的正则表达式的列表(list)。其仅仅被应用在 使用 Sitemap index files 来指向其他sitemap文件的站点。
+				默认情况下所有的sitemap都会被跟进。
+
+			4、sitemap_alternate_links
+				指定当一个 url 有可选的链接时，是否跟进。 有些非英文网站会在一个 url 块内提供其他语言的网站链接。
+				例如:
+					<url>
+					    <loc>http://example.com/</loc>
+					    <xhtml:link rel="alternate" hreflang="de" href="http://example.com/de"/>
+					</url>
+				当 sitemap_alternate_links 设置时，两个URL都会被获取。 当 sitemap_alternate_links 关闭时，只有 http://example.com/ 会被获取。
+				默认 sitemap_alternate_links 关闭。
